@@ -4,78 +4,84 @@ import (
 	"testing"
 )
 
-func TestFileTypeValues(t *testing.T) {
-	// Test if the FileType constants are correctly set
+// TestFileTypeConstants checks that FileType constants have the expected values
+func TestFileTypeConstants(t *testing.T) {
 	tests := []struct {
-		name     string
-		fileType FileType
-		expected int
+		expected FileType
+		actual   FileType
 	}{
-		{"Any", Any, 0},
-		{"Video", Video, 1},
-		{"Image", Image, 2},
-		{"Archive", Archive, 3},
-		{"Documents", Documents, 4},
+		{Any, "Any"},
+		{Video, "Video"},
+		{Image, "Image"},
+		{Archive, "Archive"},
+		{Documents, "Documents"},
 	}
 
-	for _, tt := range tests {
-		if int(tt.fileType) != tt.expected {
-			t.Errorf("FileType %s expected %d, got %d", tt.name, tt.expected, tt.fileType)
+	for _, test := range tests {
+		if test.expected != test.actual {
+			t.Errorf("expected %s, got %s", test.expected, test.actual)
 		}
 	}
 }
 
-func TestOperatorTypeValues(t *testing.T) {
-	// Test if the OperatorType constants are correctly set
+// TestOperatorTypeConstants checks that OperatorType constants have the expected values
+func TestOperatorTypeConstants(t *testing.T) {
 	tests := []struct {
-		name         string
-		operatorType OperatorType
-		expected     int
+		expected OperatorType
+		actual   OperatorType
 	}{
-		{"EqualTo", EqualToType, 0},
-		{"GreaterThan", GreaterThanType, 1},
-		{"GreaterThanEqualTo", GreaterThanEqualToType, 2},
-		{"LessThan", LessThanType, 3},
-		{"LessThanEqualTo", LessThanEqualToType, 4},
+		{EqualTo, "Equal To"},
+		{GreaterThan, "Greater Than"},
+		{GreaterThanEqualTo, "Greater Than Or Equal To"},
+		{LessThan, "Less Than"},
+		{LessThanEqualTo, "Less Than Or Equal To"},
 	}
 
-	for _, tt := range tests {
-		if int(tt.operatorType) != tt.expected {
-			t.Errorf("OperatorType %s expected %d, got %d", tt.name, tt.expected, tt.operatorType)
+	for _, test := range tests {
+		if test.expected != test.actual {
+			t.Errorf("expected %s, got %s", test.expected, test.actual)
 		}
 	}
 }
 
-func TestNewVideoFinder(t *testing.T) {
-	// Test if the NewVideoFinder function returns a valid VideoFinder instance
-	vf := NewVideoFinder()
-
-	if vf == nil {
-		t.Fatal("NewVideoFinder() returned nil")
-	}
-
-	if len(vf.Results) != 0 {
-		t.Errorf("NewVideoFinder().Results should be empty, got %d", len(vf.Results))
-	}
-}
-
+// TestFileExtensions checks that FileExtensions map contains the expected file types
 func TestFileExtensions(t *testing.T) {
-	// Test if the FileExtensions map contains the correct file extensions for each FileType
-	tests := []struct {
-		fileType   FileType
-		extensions []string
-	}{
-		{Video, []string{".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts"}},
-		{Image, []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp", ".svg", ".raw", ".heic", ".ico"}},
-		{Archive, []string{".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".tgz", ".tbz2"}},
-		{Documents, []string{".docx", ".doc", ".pdf", ".txt", ".rtf", ".odt", ".xlsx", ".xls", ".pptx", ".ppt", ".csv", ".md", ".pages"}},
+	expectedExtensions := map[FileType][]string{
+		Any: {
+			"*.*",
+		},
+		Video: {
+			".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts",
+		},
+		Image: {
+			".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp", ".svg", ".raw", ".heic", ".ico",
+		},
+		Archive: {
+			".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".tgz", ".tbz2",
+		},
+		Documents: {
+			".docx", ".doc", ".pdf", ".txt", ".rtf", ".odt", ".xlsx", ".xls", ".pptx", ".ppt", ".csv", ".md", ".pages",
+		},
 	}
 
-	for _, tt := range tests {
-		for _, ext := range tt.extensions {
-			if !FileExtensions[tt.fileType][ext] {
-				t.Errorf("FileExtensions[%d] should contain %s", tt.fileType, ext)
+	for fileType, extensions := range expectedExtensions {
+		for _, ext := range extensions {
+			if !FileExtensions[fileType][ext] {
+				t.Errorf("expected file type %s to contain extension %s", fileType, ext)
 			}
 		}
+	}
+}
+
+// TestNewFileFinder checks that NewFileFinder initializes a FileFinder with default values
+func TestNewFileFinder(t *testing.T) {
+	ff := NewFileFinder()
+
+	if ff == nil {
+		t.Fatal("expected NewFileFinder to return a non-nil pointer")
+	}
+
+	if len(ff.Results) != 0 {
+		t.Errorf("expected Results to be an empty map, got %v", ff.Results)
 	}
 }

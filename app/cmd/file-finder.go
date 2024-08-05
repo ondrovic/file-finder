@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -13,6 +13,7 @@ import (
 	"file-finder/internal/utils"
 )
 
+// #region Cli Setup
 var rootCmd = &cobra.Command{
 	Use:   "file-finder [directory]",
 	Short: "Find files of specified size and type",
@@ -23,17 +24,20 @@ var rootCmd = &cobra.Command{
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.Flags().BoolP("delete", "d", false, "Delete found files\n")
+	rootCmd.Flags().StringP("type", "t", string(types.Video), "File type to search for (Any, Video, Image, Archive, Documents)\n")
+	rootCmd.Flags().StringP("operator", "o", string(types.EqualTo), "Operator to apply on file size (Equal To, Greater Than, Greater Than Or Equal To, Less Than, Less Than Or Equal To)\n")
+	rootCmd.Flags().BoolP("delete", "d", false, "Delete found files\n(default: false)")
+	rootCmd.Flags().BoolP("detailed", "r", false, "Display detailed results\n(default: false)")
 	rootCmd.Flags().StringP("size", "s", "315 KB", "File size to search for (1 KB, 1 MB, 1 GB)\n")
-	rootCmd.Flags().IntP("type", "t", int(types.Video), "File type to search for (1: Any, 2: Video, 3: Image, 4: Archive, 5: Documents)\n")
-	rootCmd.Flags().IntP("operator", "o", int(types.EqualToType), "Operator to apply on file size (1: Equal, 2: Greater Than, 3: Greater Than Or Equal To, 4: Less Than, 5: Less Than Or Equal To)\n")
+	rootCmd.Flags().Float64P("tolerance", "l", 0.01, "File size tolerance\n")
 
+	// Bind flags with viper
 	viper.BindPFlag("delete", rootCmd.Flags().Lookup("delete"))
+	viper.BindPFlag("detailed", rootCmd.Flags().Lookup("detailed"))
 	viper.BindPFlag("size", rootCmd.Flags().Lookup("size"))
+	viper.BindPFlag("tolerance", rootCmd.Flags().Lookup("tolerance"))
 	viper.BindPFlag("type", rootCmd.Flags().Lookup("type"))
 	viper.BindPFlag("operator", rootCmd.Flags().Lookup("operator"))
-
-	viper.SetDefault("operator", int(types.EqualToType)) // Set the default value for the "operator" flag
 
 }
 
@@ -43,15 +47,33 @@ func initConfig() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	finder := types.NewVideoFinder()
-	finder.RootDir = args[0]
-	finder.DeleteFlag = viper.GetBool("delete")
-	finder.FileSize = viper.GetString("size")
-	finder.FileType = types.FileType(viper.GetInt("type"))
-	finder.OperatorType = types.OperatorType(viper.GetInt("operator"))
+	fileType := utils.ToFileType(viper.GetString("type"))
+	operatorType := utils.ToOperatorType(viper.GetString("operator"))
+
+	if fileType == "" {
+		pterm.Error.Printf("invalid file type: %s", viper.GetString("type"))
+	}
+	if operatorType == "" {
+		pterm.Error.Printf("invalid operator type: %s", viper.GetString("operator"))
+	}
+
+	finder := types.FileFinder{
+		RootDir:          args[0],
+		DeleteFlag:       viper.GetBool("delete"),
+		DetailedListFlag: viper.GetBool("detailed"),
+		FileSize:         viper.GetString("size"),
+		FileType:         fileType,
+		OperatorType:     operatorType,
+		Tolerance:        viper.GetFloat64("tolerance"),
+		Results:          make(map[string][]string),
+	}
+
 	Run(finder)
 }
 
+// #endregion
+
+// #region Main Logic
 func main() {
 	utils.ClearConsole()
 	if err := rootCmd.Execute(); err != nil {
@@ -60,8 +82,9 @@ func main() {
 	}
 }
 
-func Run(vf *types.VideoFinder) {
-	fileSizeBytes, err := utils.ConvertSizeToBytes(vf.FileSize)
+func Run(ff types.FileFinder) {
+	fileSizeBytes, err := utils.ConvertSizeToBytes(ff.FileSize)
+
 	if err != nil {
 		pterm.Error.Printf("Error converting file size: %v\n", err)
 		return
@@ -70,106 +93,24 @@ func Run(vf *types.VideoFinder) {
 	// Format the file size for logging
 	fileSizeStr := utils.FormatSize(fileSizeBytes)
 
-	fileTypeToString := utils.GetFileTypeToString(vf.FileType)
-	operatorToString := utils.GetOperatorToString(vf.OperatorType)
-
-	pterm.Info.Printf("Searching for files of type %v and size %s %s...\n", fileTypeToString, operatorToString, fileSizeStr)
-
-	err = FindFiles(vf)
+	// New file size based on tolerance
+	toleranceSizeBytes, err := utils.CalculateToleranceBytes(ff.FileSize, ff.Tolerance)
 	if err != nil {
-		pterm.Error.Printf("Error walking the path %v: %v\n", vf.RootDir, err)
+		pterm.Error.Printf("Error calculating the tolerance size %v: %v\n", ff.Tolerance, err)
 		return
 	}
 
-	DisplayResults(vf)
+	pterm.Info.Printf("Searching for files of type %v %s %s...\n",
+		ff.FileType,
+		strings.ToLower(string(ff.OperatorType)),
+		fileSizeStr,
+	)
 
-	if vf.DeleteFlag {
-		DeleteFiles(vf)
+	utils.FindAndDisplay(ff, fileSizeBytes, toleranceSizeBytes, ff.DetailedListFlag)
+
+	if ff.DeleteFlag {
+		utils.DeleteFiles(ff)
 	}
 }
 
-func FindFiles(vf *types.VideoFinder) error {
-	// Convert file size string to bytes
-	fileSize, err := utils.ConvertSizeToBytes(vf.FileSize)
-	if err != nil {
-		return err
-	}
-
-	// Estimate the total number of files
-	count, err := utils.FileCount(vf.RootDir, vf.FileType)
-	if err != nil {
-		return err
-	}
-	// Create a progress bar with the estimated total
-	progressbar, _ := pterm.DefaultProgressbar.WithTotal(count).Start()
-
-	// Walk through the files in the directory
-	err = filepath.Walk(vf.RootDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && utils.IsFileOfType(filepath.Ext(path), vf.FileType) {
-
-			sizeMatch := utils.GetOperatorSizeMatches(vf.OperatorType, fileSize, info.Size())
-
-			if sizeMatch {
-				dir := filepath.Dir(path)
-				vf.Results[dir] = append(vf.Results[dir], path)
-
-				// Update the progress bar
-				progressbar.Increment()
-			}
-		}
-		return nil
-	})
-
-	progressbar.Stop()
-	return err
-}
-
-func DisplayResults(vf *types.VideoFinder) {
-	// Prepare results slice
-	results := make([]types.DirectoryResult, 0, len(vf.Results))
-	totalFiles := 0
-
-	for dir, files := range vf.Results {
-		fileCount := len(files)
-		totalFiles += fileCount
-		results = append(results, types.DirectoryResult{
-			Directory: dir,
-			Count:     fileCount,
-		})
-	}
-
-	if totalFiles > 0 {
-		// Render the results table
-		utils.RenderResultsTable(results, totalFiles)
-	} else {
-		pterm.Info.Printf("%d files found matching criteria\n", totalFiles)
-	}
-}
-
-func DeleteFiles(vf *types.VideoFinder) {
-	result, _ := pterm.DefaultInteractiveContinue.Show("Are you sure you want to delete these files?")
-	if result != "y" {
-		pterm.Info.Println("Deletion cancelled.")
-		return
-	}
-
-	spinner, _ := pterm.DefaultSpinner.Start("Deleting files...")
-	deletedCount := 0
-
-	for _, files := range vf.Results {
-		for _, file := range files {
-			err := os.Remove(file)
-			if err != nil {
-				pterm.Error.Printf("Error deleting %s: %v\n", file, err)
-			} else {
-				deletedCount++
-			}
-		}
-	}
-
-	spinner.Success(fmt.Sprintf("Deleted %d files.", deletedCount))
-}
+// #endregion

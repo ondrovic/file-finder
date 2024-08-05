@@ -1,224 +1,197 @@
 package utils
 
 import (
+	"errors"
 	"file-finder/internal/types"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
+// #region Public Functions Tests
 func TestClearConsole(t *testing.T) {
 	// This function clears the console, so it's difficult to unit test.
 	// You can test if the function runs without errors.
 	ClearConsole()
 }
 
-func TestFileCount(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	subDir := filepath.Join(tempDir, "sub")
-	os.Mkdir(subDir, 0755)
-	file := filepath.Join(subDir, "testfile.mp4")
-	os.WriteFile(file, []byte("test"), 0644)
-
-	// Test FileCount function
-	count, err := FileCount(tempDir, types.Video)
-	if err != nil {
-		t.Fatalf("FileCount() returned error: %v", err)
-	}
-	if count != 1 {
-		t.Errorf("FileCount() returned %d, want %d", count, 1)
-	}
-}
-
-func TestGetOperatorSizeMatches(t *testing.T) {
+func TestToFileType(t *testing.T) {
 	tests := []struct {
-		operator types.OperatorType
-		fileSize int64
-		infoSize int64
-		expected bool
+		input    string
+		expected types.FileType
 	}{
-		{types.EqualToType, 100, 100, true},
-		{types.LessThanType, 100, 50, true},
-		{types.LessThanEqualToType, 100, 100, true},
-		{types.GreaterThanType, 100, 150, true},
-		{types.GreaterThanEqualToType, 100, 100, true},
-		{types.GreaterThanEqualToType, 100, 50, false},
+		{"any", types.Any},
+		{"video", types.Video},
+		{"image", types.Image},
+		{"archive", types.Archive},
+		{"documents", types.Documents},
+		{"ANY", types.Any},        // Case-insensitive check
+		{"ViDeO", types.Video},    // Mixed case check
+		{"invalid", ""},           // Invalid input check
+		{"", ""},                  // Empty string check
 	}
 
-	for _, tt := range tests {
-		result := GetOperatorSizeMatches(tt.operator, tt.fileSize, tt.infoSize)
-		if result != tt.expected {
-			t.Errorf("GetOperatorSizeMatches(%v, %d, %d) = %v; want %v", tt.operator, tt.fileSize, tt.infoSize, result, tt.expected)
+	for _, test := range tests {
+		result := ToFileType(test.input)
+		if result != test.expected {
+			t.Errorf("ToFileType(%q) = %q; expected %q", test.input, result, test.expected)
 		}
 	}
 }
 
-func TestGetOperatorToString(t *testing.T) {
+func TestToOperatorType(t *testing.T) {
 	tests := []struct {
-		operator types.OperatorType
-		expected string
+		input    string
+		expected types.OperatorType
 	}{
-		{types.EqualToType, "equal to"},
-		{types.LessThanType, "less than"},
-		{types.LessThanEqualToType, "less than or equal to"},
-		{types.GreaterThanType, "greater than"},
-		{types.GreaterThanEqualToType, "greater than or equal to"},
+		{"equal to", types.EqualTo},
+		{"equalto", types.EqualTo},
+		{"equal", types.EqualTo},
+		{"==", types.EqualTo},
+		{"greater than", types.GreaterThan},
+		{"greaterthan", types.GreaterThan},
+		{">", types.GreaterThan},
+		{"greater than or equal to", types.GreaterThanEqualTo},
+		{"greaterthanorequalto", types.GreaterThanEqualTo},
+		{">=", types.GreaterThanEqualTo},
+		{"less than", types.LessThan},
+		{"lessthan", types.LessThan},
+		{"<", types.LessThan},
+		{"less than or equal to", types.LessThanEqualTo},
+		{"lessthanorequalto", types.LessThanEqualTo},
+		{"<=", types.LessThanEqualTo},
+		{"INVALID", ""}, // Invalid input case
 	}
 
-	for _, tt := range tests {
-		result := GetOperatorToString(tt.operator)
-		if result != tt.expected {
-			t.Errorf("GetOperatorToString(%v) = %q; want %q", tt.operator, result, tt.expected)
-		}
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			result := ToOperatorType(test.input)
+			if result != test.expected {
+				t.Errorf("ToOperatorType(%q) = %v; want %v", test.input, result, test.expected)
+			}
+		})
 	}
-}
-
-func TestGetFileTypeToString(t *testing.T) {
-	tests := []struct {
-		fileType types.FileType
-		expected string
-	}{
-		{types.Any, "Any"},
-		{types.Video, "Video"},
-		{types.Image, "Image"},
-		{types.Archive, "Archive"},
-		{types.Documents, "Documents"},
-	}
-
-	for _, tt := range tests {
-		result := GetFileTypeToString(tt.fileType)
-		if result != tt.expected {
-			t.Errorf("GetFileTypeToString(%v) = %q; want %q", tt.fileType, result, tt.expected)
-		}
-	}
-}
-
-func TestIsFileOfType(t *testing.T) {
-	tests := []struct {
-		ext      string
-		fileType types.FileType
-		expected bool
-	}{
-		{".mp4", types.Video, true},
-		{".jpg", types.Image, true},
-		{".zip", types.Archive, true},
-		{".pdf", types.Documents, true},
-		{".exe", types.Video, false},
-		{".unknown", types.Any, false},
-	}
-
-	for _, tt := range tests {
-		result := IsFileOfType(tt.ext, tt.fileType)
-		if result != tt.expected {
-			t.Errorf("IsFileOfType(%q, %v) = %v; want %v", tt.ext, tt.fileType, result, tt.expected)
-		}
-	}
-}
-
-func TestFormatPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected string
-	}{
-		{"C:\\Users\\User\\file.txt", "C:/Users/User/file.txt"}, // Test for Windows
-		{"/home/user/file.txt", "/home/user/file.txt"},          // Test for Unix-like
-	}
-
-	for _, tt := range tests {
-		result := formatPath(tt.path)
-		if result != tt.expected {
-			t.Errorf("formatPath(%q) = %q; want %q", tt.path, result, tt.expected)
-		}
-	}
-}
-
-func TestRenderResultsTable(t *testing.T) {
-	// This function is difficult to unit test because it involves output.
-	// You can test if the function runs without errors.
-	results := []types.DirectoryResult{
-		{Directory: "dir1", Count: 10},
-		{Directory: "dir2", Count: 20},
-	}
-	totalCount := 30
-
-	RenderResultsTable(results, totalCount)
 }
 
 func TestConvertSizeToBytes(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected int64
-		hasError bool
+		err      error
 	}{
-		{"1 B", 1, false},
-		{"10 B", 10, false},
-		{"100 B", 100, false},
-		{"1000 B", 1000, false},
-		{"1 KB", 1024, false},
-		{"10 KB", 10240, false},
-		{"100 KB", 102400, false},
-		{"1000 KB", 1024000, false},
-		{"1 MB", 1024 * 1024, false},
-		{"10 MB", 10 * 1024 * 1024, false},
-		{"100 MB", 100 * 1024 * 1024, false},
-		{"1000 MB", 1000 * 1024 * 1024, false},
-		{"1 GB", 1024 * 1024 * 1024, false},
-		{"10 GB", 10 * 1024 * 1024 * 1024, false},
-		{"100 GB", 100 * 1024 * 1024 * 1024, false},
-		{"1000 GB", 1000 * 1024 * 1024 * 1024, false},
-		{"1 PB", 1024 * 1024 * 1024 * 1024, false},
-		{"10 PB", 10 * 1024 * 1024 * 1024 * 1024, false},
-		{"100 PB", 100 * 1024 * 1024 * 1024 * 1024, false},
-		{"1000 PB", 1000 * 1024 * 1024 * 1024 * 1024, false},
-		// Invalid cases
-		{"", 0, true},
-		{"1 ZB", 0, true},
-		{"abc", 0, true},
+		{"1 B", 1, nil},
+		{"10 KB", 10 * 1024, nil},
+		{"1 MB", 1 * 1024 * 1024, nil},
+		{"5 GB", 5 * 1024 * 1024 * 1024, nil},
+		{"100 GB", 100 * 1024 * 1024 * 1024, nil},
+		{"2.5 TB", 2.5 * 1024 * 1024 * 1024 * 1024, nil},
+		{"1 kB", 1 * 1024, nil}, // Check case insensitivity
+		{"1000M", 0, errors.New("invalid size unit")}, // No matching unit
+		{"", 0, errors.New("size cannot be empty")},
+		{"1000", 0, errors.New("invalid size format")},
+		{"1000 XYZ", 0, errors.New("invalid size unit")},
+		{"not a size", 0, errors.New("invalid size format")},
 	}
 
 	for _, test := range tests {
-		result, err := ConvertSizeToBytes(test.input)
-		if (err != nil) != test.hasError {
-			t.Errorf("ConvertSizeToBytes(%s) unexpected error: %v", test.input, err)
-		}
-		if result != test.expected {
-			t.Errorf("ConvertSizeToBytes(%s) = %d; want %d", test.input, result, test.expected)
-		}
+		t.Run(test.input, func(t *testing.T) {
+			result, err := ConvertSizeToBytes(test.input)
+
+			if result != test.expected {
+				t.Errorf("ConvertSizeToBytes(%q) = %v; want %v", test.input, result, test.expected)
+			}
+
+			if (err != nil && test.err == nil) || (err == nil && test.err != nil) || (err != nil && test.err != nil && err.Error() != test.err.Error()) {
+				t.Errorf("ConvertSizeToBytes(%q) error = %v; want %v", test.input, err, test.err)
+			}
+		})
 	}
 }
 
 func TestFormatSize(t *testing.T) {
 	tests := []struct {
-		input    int64
+		bytes    int64
 		expected string
 	}{
+		{0, "0 B"},
 		{1, "1.00 B"},
-		{10, "10.00 B"},
-		{100, "100.00 B"},
-		{1000, "1000.00 B"},
-		{1024, "1.00 KB"},
-		{10240, "10.00 KB"},
-		{102400, "100.00 KB"},
-		{1024000, "1000.00 KB"},
-		{1024 * 1024, "1.00 MB"},
-		{10 * 1024 * 1024, "10.00 MB"},
-		{100 * 1024 * 1024, "100.00 MB"},
-		{1000 * 1024 * 1024, "1000.00 MB"},
-		{1024 * 1024 * 1024, "1.00 GB"},
-		{10 * 1024 * 1024 * 1024, "10.00 GB"},
-		{100 * 1024 * 1024 * 1024, "100.00 GB"},
-		{1000 * 1024 * 1024 * 1024, "1000.00 GB"},
-		{1024 * 1024 * 1024 * 1024, "1.00 PB"},
-		{10 * 1024 * 1024 * 1024 * 1024, "10.00 PB"},
-		{100 * 1024 * 1024 * 1024 * 1024, "100.00 PB"},
-		{1000 * 1024 * 1024 * 1024 * 1024, "1000.00 PB"},
+		{1024, "1.00 KB"},            // 1024 bytes exactly 1 KB
+		{2048, "2.00 KB"},            // 2048 bytes should be 2 KB
+		{1048576, "1.00 MB"},         // 1048576 bytes exactly 1 MB
+		{2097152, "2.00 MB"},         // 2097152 bytes should be 2 MB
+		{1073741824, "1.00 GB"},      // 1073741824 bytes exactly 1 GB
+		{2147483648, "2.00 GB"},      // 2147483648 bytes should be 2 GB
+		{1125899906842624, "1.00 PB"},// 1125899906842624 bytes exactly 1 PB
+		{2251799813685248, "2.00 PB"},// 2251799813685248 bytes should be 2 PB
 	}
 
 	for _, test := range tests {
-		result := FormatSize(test.input)
-		if result != test.expected {
-			t.Errorf("FormatSize(%d) = %s; want %s", test.input, result, test.expected)
-		}
+		t.Run(test.expected, func(t *testing.T) {
+			result := FormatSize(test.bytes)
+			if result != test.expected {
+				t.Errorf("FormatSize(%v) = %v; want %v", test.bytes, result, test.expected)
+			}
+		})
 	}
 }
+
+func TestCalculateTolerancePercentage(t *testing.T) {
+	tests := []struct {
+		tolerance float64
+		precision int
+		expected  string
+	}{
+		{0.1234, 2, "12.34%"},
+		{0.1234, 3, "12.340%"},
+		{1.0, 0, "100%"},
+		{0.5678, 1, "56.8%"},
+		{0.1, 4, "10.0000%"},
+		{0.9876, 5, "98.76000%"},
+		{0.0, 2, "0.00%"},
+		{0.9999, 2, "99.99%"},
+		{0.0001, 2, "0.01%"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.expected, func(t *testing.T) {
+			result := CalculateTolerancePercentage(test.tolerance, test.precision)
+			if result != test.expected {
+				t.Errorf("CalculateTolerancePercentage(%v, %v) = %v; want %v", test.tolerance, test.precision, result, test.expected)
+			}
+		})
+	}
+}
+
+func TestCalculateToleranceBytes(t *testing.T) {
+	tests := []struct {
+		sizeStr   string
+		tolerance float64
+		expected  int64
+		wantErr   bool
+	}{
+		{"1 KB", 10, 1126, false},             // 1 KB + 10% tolerance
+		{"1 MB", 50, 1572864, false},         // 1 MB + 50% tolerance
+		{"100 B", 100, 200, false},           // 100 B + 100% tolerance
+		{"10 GB", 0, 10737418240, false},    // 10 GB + 0% tolerance
+		{"2.5 KB", 20, 3072, false},          // 2.5 KB + 20% tolerance
+		{"10 MB", 25, 13107200, false},       // 10 MB + 25% tolerance
+		{"1000 B", 0, 1000, false},           // 1000 B + 0% tolerance
+		{"5 GB", -10, 4831838208, false},     // 5 GB - 10% tolerance
+		{"500 KB", 200, 1536000, false},      // 500 KB + 200% tolerance
+		{"", 10, 0, true},                    // Empty size string should return an error
+		{"1 KB", -10, 921, false},            // 1 KB - 10% tolerance
+	}
+
+	for _, test := range tests {
+		t.Run(test.sizeStr, func(t *testing.T) {
+			result, err := CalculateToleranceBytes(test.sizeStr, test.tolerance)
+			if (err != nil) != test.wantErr {
+				t.Errorf("CalculateToleranceBytes(%v, %v) error = %v; wantErr %v", test.sizeStr, test.tolerance, err, test.wantErr)
+				return
+			}
+			if result != test.expected {
+				t.Errorf("CalculateToleranceBytes(%v, %v) = %v; want %v", test.sizeStr, test.tolerance, result, test.expected)
+			}
+		})
+	}
+}
+
+// #endregion
