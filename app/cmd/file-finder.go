@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -11,6 +11,9 @@ import (
 
 	"file-finder/internal/types"
 	"file-finder/internal/utils"
+
+	commonTypes "github.com/ondrovic/common/types"
+	commonUtils "github.com/ondrovic/common/utils"
 )
 
 // #region Cli Setup
@@ -24,10 +27,10 @@ var rootCmd = &cobra.Command{
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.Flags().StringP("type", "t", string(types.Video), "File type to search for (Any, Video, Image, Archive, Documents)\n")
-	rootCmd.Flags().StringP("operator", "o", string(types.EqualTo), "Operator to apply on file size (Equal To, Greater Than, Greater Than Or Equal To, Less Than, Less Than Or Equal To)\n")
-	rootCmd.Flags().BoolP("delete", "d", false, "Delete found files\n(default: false)")
-	rootCmd.Flags().BoolP("detailed", "r", false, "Display detailed results\n(default: false)")
+	rootCmd.Flags().StringP("type", "t", string(commonTypes.FileTypes.Video), "File type to search for (Any, Video, Image, Archive, Documents)\n")
+	rootCmd.Flags().StringP("operator", "o", string(commonTypes.OperatorTypes.EqualTo), "Operator to apply on file size (Equal To, Greater Than, Greater Than Or Equal To, Less Than, Less Than Or Equal To)\n")
+	rootCmd.Flags().BoolP("delete", "r", false, "Delete found files\n(default: false)")
+	rootCmd.Flags().BoolP("detailed", "d", false, "Display detailed results\n(default: false)")
 	rootCmd.Flags().StringP("size", "s", "315 KB", "File size to search for (1 KB, 1 MB, 1 GB)\n")
 	rootCmd.Flags().Float64P("tolerance", "l", 0.01, "File size tolerance\n")
 
@@ -47,8 +50,8 @@ func initConfig() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	fileType := utils.ToFileType(viper.GetString("type"))
-	operatorType := utils.ToOperatorType(viper.GetString("operator"))
+	fileType := commonUtils.ToFileType(viper.GetString("type"))
+	operatorType := commonUtils.ToOperatorType(viper.GetString("operator"))
 
 	if fileType == "" {
 		pterm.Error.Printf("invalid file type: %s", viper.GetString("type"))
@@ -75,15 +78,15 @@ func run(cmd *cobra.Command, args []string) {
 
 // #region Main Logic
 func main() {
-	utils.ClearConsole()
+	commonUtils.ClearTerminalScreen(runtime.GOOS)
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		pterm.Error.Println(err)
 		os.Exit(1)
 	}
 }
 
 func Run(ff types.FileFinder) {
-	fileSizeBytes, err := utils.ConvertSizeToBytes(ff.FileSize)
+	fileSizeBytes, err := commonUtils.ConvertStringSizeToBytes(ff.FileSize)
 
 	if err != nil {
 		pterm.Error.Printf("Error converting file size: %v\n", err)
@@ -91,10 +94,10 @@ func Run(ff types.FileFinder) {
 	}
 
 	// Format the file size for logging
-	fileSizeStr := utils.FormatSize(fileSizeBytes)
+	fileSizeStr := commonUtils.FormatSize(fileSizeBytes)
 
 	// New file size based on tolerance
-	toleranceSizeBytes, err := utils.CalculateToleranceBytes(ff.FileSize, ff.Tolerance)
+	toleranceSizeBytes, err := commonUtils.CalculateToleranceToBytes(ff.FileSize, ff.Tolerance)
 	if err != nil {
 		pterm.Error.Printf("Error calculating the tolerance size %v: %v\n", ff.Tolerance, err)
 		return
