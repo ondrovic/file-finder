@@ -65,6 +65,8 @@ github.com/ondrovic/common v0.1.8 h1:abC8jvKs+r/mdojQEW4Rdwq3B7dqbjow9JnH/5A3SOs
 github.com/ondrovic/common v0.1.8/go.mod h1:MkaqO7/XN8VYahaFmq7duBZQRGhNj8cuUs5RXaoKhCo=
 github.com/ondrovic/common v0.1.9 h1:kRNtyI2mpb0zXby2CExlxm4JqV1XZDdZ06hlbt7u/9o=
 github.com/ondrovic/common v0.1.9/go.mod h1:MkaqO7/XN8VYahaFmq7duBZQRGhNj8cuUs5RXaoKhCo=
+github.com/ondrovic/common v0.1.10 h1:fLa6PdoUvx0KY4+llU40e6uyM19B3clTfLkRqn3xjv0=
+github.com/ondrovic/common v0.1.10/go.mod h1:MkaqO7/XN8VYahaFmq7duBZQRGhNj8cuUs5RXaoKhCo=
 github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
 github.com/pelletier/go-toml/v2 v2.2.2/go.mod h1:1t835xjRzz80PqgE6HHgN2JOsmgYu/h4qDAS4n929Rs=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

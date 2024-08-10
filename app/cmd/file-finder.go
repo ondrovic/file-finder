@@ -31,9 +31,9 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.Flags().StringP("type", "t", string(commonTypes.FileTypes.Video), "File type to search for (Any, Video, Image, Archive, Documents)\n")
-	rootCmd.Flags().StringP("operator", "o", string(commonTypes.OperatorTypes.EqualTo), "Operator to apply on file size (Equal To, Greater Than, Greater Than Or Equal To, Less Than, Less Than Or Equal To)\n")
-	rootCmd.Flags().BoolP("delete", "r", false, "Delete found files\n(default: false)")
-	rootCmd.Flags().BoolP("detailed", "d", false, "Display detailed results\n(default: false)")
+	rootCmd.Flags().StringP("operator", "o", string(commonTypes.OperatorTypes.EqualTo), "Operator to apply on file size\n(EqualTo: 'et', 'equal to', 'equal', '==')\n(GreaterThan: 'gt','greater', 'greater than', '>')\n(GreaterThanEqualTo: 'gte', 'greater than or equal to', 'greaterthanorequalto', '>=')\n(LessThan: 'lt', 'less', 'less than', 'lessthan', '<')\n(LessThanEqualTo: 'lte', 'less than or equal to',  'lessthanorequalto', '<=')\n")
+	rootCmd.Flags().BoolP("delete", "r", false, "Delete found files\n (default: false)")
+	rootCmd.Flags().BoolP("detailed", "d", false, "Display detailed results\n (default: false)")
 	rootCmd.Flags().StringP("size", "s", "", "File size to search for (1 KB, 1 MB, 1 GB)\n")
 	rootCmd.Flags().Float64P("tolerance", "l", 0.05, "File size tolerance\n")
 
