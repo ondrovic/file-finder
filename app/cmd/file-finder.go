@@ -1,7 +1,9 @@
 package main
 
 import (
+	// "fmt"
 	"os"
+	// "reflect"
 	"runtime"
 	"strings"
 
@@ -117,10 +119,18 @@ func Run(ff types.FileFinder) {
 		toleranceSizeStr,
 	)
 
-	utils.FindAndDisplayFiles(ff, fileSizeBytes, ff.Tolerance, ff.DetailedListFlag)
+	files, err := utils.FindAndDisplayFiles(ff, fileSizeBytes, ff.Tolerance, ff.DetailedListFlag)
 
+	if err != nil {
+		pterm.Error.Printf("Error calculating tolerances: %v\n", err)
+		return
+	}
+
+	// fmt.Println(files)
+
+	
 	if ff.DeleteFlag {
-		utils.DeleteFiles(ff)
+		utils.DeleteFiles(files)
 	}
 }
 
