@@ -32,7 +32,7 @@ func FindAndDisplayFiles(ff types.FileFinder, targetSize int64, toleranceSize fl
 		return nil, err
 	}
 
-	progressbar, _ := pterm.DefaultProgressbar.WithTotal(count).Start()
+	progressbar, _ := pterm.DefaultProgressbar.WithTotal(count).WithRemoveWhenDone(true).Start()
 
 	if !detailedListing {
 		ff.Results = results.(map[string][]string)
