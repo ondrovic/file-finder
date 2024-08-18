@@ -1,4 +1,14 @@
-
+project:
+    readme:
+        ☐ update readme
+            ☐ include bages from workflows
+            ☐ usage examples
+    makefile:
+        ☐ setup Makefile
+    github:
+        workflows:
+            ☐ setup testing workflow
+            ☐ setup go releaser workflow
 app/cmd/finder/file-finder.go:
     ☐ Add common funcs
         ☐ Application Banner
