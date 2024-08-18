@@ -5,11 +5,13 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strings"
+
+	// "strings"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+
+	// "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"file-finder/internal/types"
@@ -17,6 +19,8 @@ import (
 
 	commonTypes "github.com/ondrovic/common/types"
 	commonUtils "github.com/ondrovic/common/utils"
+	commonCli "github.com/ondrovic/common/utils/cli"
+	// commonFormatters "github.com/ondrovic/common/utils/formatters"
 )
 
 // #region Cli Setup
@@ -67,11 +71,11 @@ func registerFloat64Flag(cmd *cobra.Command, name, shorthand string, value float
 	cmd.Flags().Float64VarP(target, name, shorthand, value, usage+"\n")
 }
 
-func bindFlags(cmd *cobra.Command) {
-    cmd.Flags().VisitAll(func(f *pflag.Flag) {
-        viper.BindPFlag(f.Name, f)
-    })
-}
+// func bindFlags(cmd *cobra.Command) {
+//     cmd.Flags().VisitAll(func(f *pflag.Flag) {
+//         viper.BindPFlag(f.Name, f)
+//     })
+// }
 
 func newCompletionCmd() *cobra.Command {
 	return &cobra.Command{
@@ -96,17 +100,18 @@ func newCompletionCmd() *cobra.Command {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	registerBoolFlag(rootCmd, "delete", "r", false, "Delete found files", &options.DeleteFlag)
-	registerBoolFlag(rootCmd, "detailed", "d", false, "Display detailed results", &options.DetailedListFlag)
-	registerFloat64Flag(rootCmd, "tolerance", "l", 0.05, "File size tolerance", &options.Tolerance)
-	registerStringFlag(rootCmd, "type", "t", string(commonTypes.FileTypes.Video), "File type to search for (Any, Archive, Documents, Image, Video)", &options.FileType, nil)
-	registerStringFlag(rootCmd, "operator", "o", string(commonTypes.OperatorTypes.EqualTo), "Operator to apply on file size\n(EqualTo: 'et', 'equal to', 'equal', '==')\n(GreaterThan: 'gt','greater', 'greater than', '>')\n(GreaterThanEqualTo: 'gte', 'greater than or equal to', 'greaterthanorequalto', '>=')\n(LessThan: 'lt', 'less', 'less than', 'lessthan', '<')\n(LessThanEqualTo: 'lte', 'less than or equal to',  'lessthanorequalto', '<='))", &options.OperatorType, nil)
-	registerStringFlag(rootCmd, "size", "s", "", "File size to search for (1 KB, 1 MB, 1 GB)", &options.FileSize, nil)
-
+	registerBoolFlag(rootCmd, "display-app-banner", "b", false, "Whether or not to display the application banner", &options.DisplayApplicationBanner)
+	registerBoolFlag(rootCmd, "display-detailed-results", "d", false, "Display detailed results", &options.DisplayDetailedResults)
+	registerBoolFlag(rootCmd, "list-duplicate-files", "u", false, "Lists duplicate files", &options.ListDuplicateFiles)
+	registerBoolFlag(rootCmd, "remove-files", "r", false, "Remove found files", &options.RemoveFiles)
+	registerFloat64Flag(rootCmd, "tolerance-size", "l", 0.05, "File size tolerance", &options.ToleranceSize)
+	registerStringFlag(rootCmd, "file-name-filter", "f", "", "Name to filter results by", &options.FileNameFilter, nil)
+	registerStringFlag(rootCmd, "file-size-filter", "s", "", "File size to search for (1 KB, 1 MB, 1 GB)", &options.FileSizeFilter, nil)
+	registerStringFlag(rootCmd, "file-type-filter", "t", string(commonTypes.FileTypes.Any), "File type to search for (Any, Archive, Documents, Image, Video)", &options.FileTypeFilter, nil)
+	registerStringFlag(rootCmd, "operator-type", "o", string(commonTypes.OperatorTypes.EqualTo), "Operator to apply on file size\n(EqualTo: 'et', 'equal to', 'equal', '==')\n(GreaterThan: 'gt','greater', 'greater than', '>')\n(GreaterThanEqualTo: 'gte', 'greater than or equal to', 'greaterthanorequalto', '>=')\n(LessThan: 'lt', 'less', 'less than', 'lessthan', '<')\n(LessThanEqualTo: 'lte', 'less than or equal to',  'lessthanorequalto', '<='))", &options.OperatorTypeFilter, nil)
 	rootCmd.AddCommand(newCompletionCmd())
-	
-	// Bind flags with viper
-	bindFlags(rootCmd)
+
+	viper.BindPFlags(rootCmd.Flags())
 }
 
 func initConfig() {
@@ -115,27 +120,30 @@ func initConfig() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	
-	fileType := commonUtils.ToFileType(string(viper.GetString("type")))
-	operatorType := commonUtils.ToOperatorType(string(viper.GetString("operator")))
+
+	fileType := commonUtils.ToFileType(string(viper.GetString("file-type-filter")))
+	operatorType := commonUtils.ToOperatorType(string(viper.GetString("operator-type")))
 
 	if fileType == "" {
-		pterm.Error.Printf("invalid file type: %s", viper.GetString("type"))
+		pterm.Error.Printf("invalid file type: %s", viper.GetString("file-type-filter"))
 	}
-	
+
 	if operatorType == "" {
-		pterm.Error.Printf("invalid operator type: %s", viper.GetString("operator"))
+		pterm.Error.Printf("invalid operator type: %s", viper.GetString("operator-type"))
 	}
 
 	fileFinder := types.FileFinder{
-		RootDir:          args[0],
-		DeleteFlag:       viper.GetBool("delete"),
-		DetailedListFlag: viper.GetBool("detailed"),
-		FileSize:         viper.GetString("size"),
-		FileType:         fileType,
-		OperatorType:     operatorType,
-		Tolerance:        viper.GetFloat64("tolerance"),
-		Results:          make(map[string][]string),
+		DisplayApplicationBanner: viper.GetBool("display-app-banner"),
+		DisplayDetailedResults:   viper.GetBool("display-detailed-results"),
+		FileNameFilter:           viper.GetString("file-name-filter"),
+		FileSizeFilter:           viper.GetString("file-size-filter"),
+		FileTypeFilter:           fileType,
+		ListDuplicateFiles:       viper.GetBool("list-duplicate-files"),
+		RemoveFiles:              viper.GetBool("remove-files"),
+		ToleranceSize:            viper.GetFloat64("tolerance-size"),
+		OperatorTypeFilter:       operatorType,
+		Results:                  make(map[string][]string),
+		RootDirectory:            args[0],
 	}
 
 	Run(fileFinder)
@@ -145,53 +153,53 @@ func run(cmd *cobra.Command, args []string) {
 
 // #region Main Logic
 func main() {
-	commonUtils.ClearTerminalScreen(runtime.GOOS)
+	commonCli.ClearTerminalScreen(runtime.GOOS)
 	if err := rootCmd.Execute(); err != nil {
-		pterm.Error.Println(err)
-		os.Exit(1)
+		return
 	}
 }
 
 func Run(ff types.FileFinder) {
-	fileSizeBytes, err := commonUtils.ConvertStringSizeToBytes(ff.FileSize)
+	// fileSizeBytes, err := commonUtils.ConvertStringSizeToBytes(ff.FileSize)
+
+	// if err != nil {
+	// 	pterm.Error.Printf("Error converting file size: %v\n", err)
+	// 	return
+	// }
+
+	// // Format the file size for logging
+	// fileSizeStr := commonFormatters.FormatSize(fileSizeBytes)
+	// results, err := commonUtils.CalculateTolerances(fileSizeBytes, ff.ToleranceSize)
+
+	// if err != nil {
+	// 	pterm.Error.Printf("Error calculating tolerances: %v\n", err)
+	// 	return
+	// }
+
+	// // Calculate the tolerance size string
+	// toleranceSizeStr := ""
+	// if fileSizeStr != commonFormatters.FormatSize(results.LowerBoundSize) || fileSizeStr != commonFormatters.FormatSize(results.UpperBoundSize) {
+	// 	toleranceSizeStr = "( with a tolerance size of " + commonFormatters.FormatSize(results.LowerBoundSize) + " and " + commonFormatters.FormatSize(results.UpperBoundSize) + " )"
+	// }
+
+	// pterm.Info.Printf("Searching for files of type %v %s %s %s...\n",
+	// ff.FileType,
+	// strings.ToLower(string(ff.OperatorType)),
+	// fileSizeStr,
+	// toleranceSizeStr,
+	// )
+
+
+	files, err := utils.FindAndDisplayFiles(ff)
 
 	if err != nil {
-		pterm.Error.Printf("Error converting file size: %v\n", err)
-		return
-	}
-
-	// Format the file size for logging
-	fileSizeStr := commonUtils.FormatSize(fileSizeBytes)
-	results, err := commonUtils.CalculateTolerances(fileSizeBytes, ff.Tolerance)
-
-	if err != nil {
-		pterm.Error.Printf("Error calculating tolerances: %v\n", err)
-		return
-	}
-
-	// Calculate the tolerance size string
-	toleranceSizeStr := ""
-	if fileSizeStr != commonUtils.FormatSize(results.LowerBoundSize) || fileSizeStr != commonUtils.FormatSize(results.UpperBoundSize) {
-		toleranceSizeStr = "( with a tolerance size of " + commonUtils.FormatSize(results.LowerBoundSize) + " and " + commonUtils.FormatSize(results.UpperBoundSize) + " )"
-	}
-
-	pterm.Info.Printf("Searching for files of type %v %s %s %s...\n",
-		ff.FileType,
-		strings.ToLower(string(ff.OperatorType)),
-		fileSizeStr,
-		toleranceSizeStr,
-	)
-
-	files, err := utils.FindAndDisplayFiles(ff, fileSizeBytes, ff.Tolerance, ff.DetailedListFlag)
-
-	if err != nil {
-		pterm.Error.Printf("Error calculating tolerances: %v\n", err)
+		pterm.Error.Printf("error finding files: %v\n", err)
 		return
 	}
 
 	// fmt.Println(files)
 
-	if ff.DeleteFlag {
+	if ff.RemoveFiles {
 		utils.DeleteFiles(files)
 	}
 }

@@ -16,8 +16,9 @@ import (
 
 	"file-finder/internal/types"
 
-	commonTypes "github.com/ondrovic/common/types"
+	// commonTypes "github.com/ondrovic/common/types"
 	commonUtils "github.com/ondrovic/common/utils"
+	commonFormatters "github.com/ondrovic/common/utils/formatters"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pterm/pterm"
@@ -26,15 +27,15 @@ import (
 var semaphore = make(chan struct{}, runtime.NumCPU())
 
 // FindAndDisplayFiles gathers the results and displays them
-func FindAndDisplayFiles(ff types.FileFinder, targetSize int64, toleranceSize float64, detailedListing bool) (interface{}, error) {
-	results, count, err := getFiles(ff.RootDir, ff.FileType, targetSize, ff.OperatorType, toleranceSize, detailedListing)
+func FindAndDisplayFiles(ff types.FileFinder) (interface{}, error) {
+	results, count, err := getFiles(ff)
 	if err != nil {
 		return nil, err
 	}
 
 	progressbar, _ := pterm.DefaultProgressbar.WithTotal(count).WithRemoveWhenDone(true).Start()
 
-	if !detailedListing {
+	if !ff.DisplayDetailedResults {
 		ff.Results = results.(map[string][]string)
 		for i := 0; i < count; i++ {
 			progressbar.Increment()
@@ -49,7 +50,7 @@ func FindAndDisplayFiles(ff types.FileFinder, targetSize int64, toleranceSize fl
 	progressbar.Stop()
 
 	if count > 0 {
-		renderResultsToTable(results, count, detailedListing)
+		renderResultsToTable(results, count, ff)
 	} else {
 		pterm.Info.Printf("%d results found matching criteria\n", count)
 	}
@@ -64,6 +65,117 @@ func getResultsCount(results interface{}) (int, error) {
 		return 0, errors.New("results is not a slice or array")
 	}
 	return val.Len(), nil
+}
+
+// getFiles handles getting the files based on the criteria
+func getFiles(ff types.FileFinder) (interface{}, int, error) {
+
+	entries, err := os.ReadDir(ff.RootDirectory)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var detailedResults []types.EntryResults
+	results := make(map[string][]string)
+	var totalCount int
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// convert filter to bytes
+	var fileSize int64
+	if ff.FileSizeFilter != "" {
+		var err error
+		fileSize, err = commonUtils.ConvertStringSizeToBytes(ff.FileSizeFilter)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	for _, entry := range entries {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			if entry.IsDir() {
+				semaphore <- struct{}{}
+				subFF := ff
+				subFF.RootDirectory = path
+				subResult, subCount, err := getFiles(subFF)
+				<-semaphore
+				if err != nil {
+					return
+				}
+				mu.Lock()
+				if ff.DisplayDetailedResults {
+					detailedResults = append(detailedResults, subResult.([]types.EntryResults)...)
+				} else {
+					for dir, files := range subResult.(map[string][]string) {
+						results[dir] = append(results[dir], files...)
+					}
+				}
+				totalCount += subCount
+				mu.Unlock()
+			} else {
+				if commonUtils.IsExtensionValid(ff.FileTypeFilter, path) {
+					info, err := entry.Info()
+					if err != nil {
+						return
+					}
+
+					size := info.Size()
+
+					// Apply FileSize filter only if it's present
+					var sizeMatches bool
+					if ff.FileSizeFilter != "" {
+						sizeMatches, err = commonUtils.GetOperatorSizeMatches(ff.OperatorTypeFilter, fileSize, ff.ToleranceSize, size)
+						if err != nil {
+							// pterm.Error.Printf("Error getting size matches: %v\n", err)
+							pterm.Error.Println(err)
+							return
+						}
+						if !sizeMatches {
+							return
+						}
+					}
+
+					// convert ToLower
+					lowerEntryName, err := commonFormatters.ToLower(entry.Name())
+					if err != nil {
+						pterm.Error.Println(err)
+						return
+					}
+					lowerFileNameFilter, err := commonFormatters.ToLower(ff.FileNameFilter)
+					if err != nil {
+						pterm.Error.Println(err)
+						return
+					}
+					// Apply FileNameFilter if present
+					if ff.FileNameFilter != "" && !strings.Contains(lowerEntryName, lowerFileNameFilter) {
+						return
+					}
+
+					mu.Lock()
+					if ff.DisplayDetailedResults {
+						detailedResults = append(detailedResults, types.EntryResults{
+							Directory: ff.RootDirectory,
+							FileName:  entry.Name(),
+							FileSize:  commonFormatters.FormatSize(size),
+						})
+					} else {
+						results[ff.RootDirectory] = append(results[ff.RootDirectory], path)
+					}
+					totalCount++
+					mu.Unlock()
+				}
+			}
+		}(filepath.Join(ff.RootDirectory, entry.Name()))
+	}
+
+	wg.Wait()
+
+	if ff.DisplayDetailedResults {
+		return detailedResults, totalCount, nil
+	}
+	return results, totalCount, nil
 }
 
 func deleteEntryResults(entries []types.EntryResults) (int, []string) {
@@ -228,82 +340,6 @@ func DeleteFiles(results interface{}) {
 	}
 }
 
-// getFiles handles getting the files based on the criteria
-func getFiles(dir string, fileType commonTypes.FileType, targetSize int64, operatorType commonTypes.OperatorType, toleranceSize float64, detailed bool) (interface{}, int, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	var detailedResults []types.EntryResults
-	results := make(map[string][]string)
-	var totalCount int
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, entry := range entries {
-		wg.Add(1)
-		go func(path string) {
-			defer wg.Done()
-			if entry.IsDir() {
-				semaphore <- struct{}{}
-				subResult, subCount, err := getFiles(path, fileType, targetSize, operatorType, toleranceSize, detailed)
-				<-semaphore
-				if err != nil {
-					return
-				}
-				mu.Lock()
-				if detailed {
-					detailedResults = append(detailedResults, subResult.([]types.EntryResults)...)
-				} else {
-					for dir, files := range subResult.(map[string][]string) {
-						results[dir] = append(results[dir], files...)
-					}
-				}
-				totalCount += subCount
-				mu.Unlock()
-			} else {
-				if commonUtils.IsExtensionValid(fileType, path) {
-					info, err := entry.Info()
-					if err != nil {
-						return
-					}
-
-					size := info.Size()
-
-					matches, err := commonUtils.GetOperatorSizeMatches(operatorType, targetSize, toleranceSize, size)
-
-					if err != nil {
-						pterm.Error.Printf("Error calculating tolerances: %v\n", err)
-					}
-
-					if matches {
-						mu.Lock()
-						if detailed {
-							detailedResults = append(detailedResults, types.EntryResults{
-								Directory: dir,
-								FileName:  entry.Name(),
-								FileSize:  commonUtils.FormatSize(size),
-							})
-						} else {
-							results[dir] = append(results[dir], path)
-						}
-						totalCount++
-						mu.Unlock()
-					}
-				}
-			}
-		}(filepath.Join(dir, entry.Name()))
-	}
-
-	wg.Wait()
-
-	if detailed {
-		return detailedResults, totalCount, nil
-	}
-	return results, totalCount, nil
-}
-
 // processResults processes the results
 func processResults(results map[string][]string) []types.DirectoryResult {
 	var processedResults []types.DirectoryResult
@@ -317,15 +353,15 @@ func processResults(results map[string][]string) []types.DirectoryResult {
 }
 
 // renderResultsToTable renders the results into a formatted table
-func renderResultsToTable(results interface{}, totalCount int, detailedListing bool) {
+func renderResultsToTable(results interface{}, totalCount int, ff types.FileFinder) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
-	if detailedListing {
+	if ff.DisplayDetailedResults {
 		t.AppendHeader(table.Row{"Directory", "FileName", "FileSize"})
 		for _, result := range results.([]types.EntryResults) {
 			t.AppendRow(table.Row{
-				commonUtils.FormatPath(result.Directory, runtime.GOOS),
+				commonFormatters.FormatPath(result.Directory, runtime.GOOS),
 				result.FileName,
 				result.FileSize,
 			})
@@ -334,7 +370,7 @@ func renderResultsToTable(results interface{}, totalCount int, detailedListing b
 		t.AppendHeader(table.Row{"Directory", "Count"})
 		for _, result := range results.([]types.DirectoryResult) {
 			t.AppendRow(table.Row{
-				commonUtils.FormatPath(result.Directory, runtime.GOOS),
+				commonFormatters.FormatPath(result.Directory, runtime.GOOS),
 				result.Count,
 			})
 		}

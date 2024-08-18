@@ -1,10 +1,12 @@
 module file-finder
 
-go 1.22.5
+go 1.22.6
+
+toolchain go1.23.0
 
 require (
 	github.com/jedib0t/go-pretty/v6 v6.5.9
-	github.com/ondrovic/common v0.1.12
+	github.com/ondrovic/common v0.1.24
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5

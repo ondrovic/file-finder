@@ -1,0 +1,37 @@
+
+app/cmd/finder/file-finder.go:
+    ☐ Add common funcs
+        ☐ Application Banner
+            ☐ implement display banner logic
+        ☐ Version
+    ✔ Make file-size optional, not required @done(24-08-18 09:28)
+    ☐ Add Flag for find duplicate files
+    ☐ Update rootCmd to new format
+    ✔ Add Flag to display banner @done(24-08-18 11:55)
+    ☐ Make operator flag required if file-size is used
+        ☐ set default operator flags
+    ✔ Create file-name-filter flag @done(24-08-17 08:54)
+    ☐ Move cli related items out of file-finder.go and to own internal/cli package
+        ☐ register funcs
+        ☐ completeCmd
+    ☐ Reworks stauts message based on new flags
+    ☐ Unit tests
+    ☐ Code cleanup
+    
+internal:
+    types:
+        types.go:
+            FileFinder:
+                ✔ Add FileNameFilter option @done(24-08-18 08:54)
+    utils:
+        utils.go:
+            ✔ Adjust funcs based on FileSize option change @done(24-08-18 11:39)
+            ✔ Adjust funcs to search by FileNameFilter option @done(24-08-18 11:39)
+            ☐ Create logic to find duplicate files
+                ☐ hash comparison
+                ☐ name similarities
+            ☐ Wire up common funcs
+                ☐ GenericRenderResultsTableInterface
+                ☐ GenericSortInterface
+            ☐ Unit tests
+            ☐ Code cleanup

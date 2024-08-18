@@ -4,16 +4,25 @@ import (
 	commonTypes "github.com/ondrovic/common/types"
 )
 
+type FileInfo struct {
+	Path string
+	Size int64
+	Hash string
+}
+
 // FileFinder struct remains the same
 type FileFinder struct {
-	RootDir          string
-	DeleteFlag       bool
-	DetailedListFlag bool
-	FileSize         string
-	FileType         commonTypes.FileType
-	OperatorType     commonTypes.OperatorType
-	Tolerance        float64
-	Results          map[string][]string
+	DisplayApplicationBanner bool
+	DisplayDetailedResults   bool
+	FileNameFilter           string
+	FileSizeFilter           string
+	FileTypeFilter           commonTypes.FileType
+	ListDuplicateFiles       bool
+	OperatorTypeFilter       commonTypes.OperatorType
+	RemoveFiles              bool
+	Results                  map[string][]string
+	RootDirectory            string
+	ToleranceSize            float64
 }
 
 // DirectoryResults struct for the results
@@ -29,7 +38,7 @@ type EntryResults struct {
 	FileSize  string
 }
 
-//NewFileFinder initializes a new FileFinder object
+// NewFileFinder initializes a new FileFinder object
 func NewFileFinder() *FileFinder {
 	return &FileFinder{
 		Results: make(map[string][]string),
