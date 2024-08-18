@@ -193,37 +193,42 @@ func deleteEntryResults(entries []types.EntryResults) (int, []string) {
 	return deletedCount, directoriesToRemove
 }
 
-func deleteDirectoryResults(dirResults []types.DirectoryResult) (int, []string) {
-	var deletedCount int
-	var directoriesToRemove []string
 
-	for _, dirResult := range dirResults {
-		// Add the base directory to the list of directories to remove
-		directoriesToRemove = append(directoriesToRemove, dirResult.Directory)
+// BUG: when doing the directory result it doesn't list the files so you end up deleting the entire directory of files ;-(
+//      going to think on how I want to do this, but for now I am just doing to disable -r unless -d is used
+// func deleteDirectoryResults(dirResults []types.DirectoryResult) (int, []string) {
+// 	var deletedCount int
+// 	var directoriesToRemove []string
 
-		err := filepath.Walk(dirResult.Directory, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				if err := os.Remove(path); err != nil {
-					pterm.Error.Printf("Error deleting file %s: %v\n", path, err)
-				} else {
-					deletedCount++
-				}
-			} else {
-				directoriesToRemove = append(directoriesToRemove, path)
-			}
-			return nil
-		})
+// 	for _, dirResult := range dirResults {
+// 		// Add the base directory to the list of directories to remove
+// 		directoriesToRemove = append(directoriesToRemove, dirResult.Directory)
 
-		if err != nil {
-			pterm.Error.Printf("Error walking directory %s: %v\n", dirResult.Directory, err)
-		}
-	}
+// 		// bug: I think we need to make sure the directory is empty before deleting it
+// 		err := filepath.Walk(dirResult.Directory, func(path string, info os.FileInfo, err error) error {
+// 			if err != nil {
+// 				return err
+// 			}
+// 			if !info.IsDir() {
+// 				if err := os.Remove(path); err != nil {
+// 					pterm.Error.Printf("Error deleting file %s: %v\n", path, err)
+// 				} else {
+// 					deletedCount++
+// 				}
+// 			} else {
+// 				directoriesToRemove = append(directoriesToRemove, path)
+// 			}
+// 			return nil
+// 		})
 
-	return deletedCount, directoriesToRemove
-}
+// 		if err != nil {
+// 			pterm.Error.Printf("Error walking directory %s: %v\n", dirResult.Directory, err)
+// 		}
+// 	}
+
+// 	return deletedCount, directoriesToRemove
+// }
+
 
 func deleteFileBasedOnResults(results interface{}) error {
 	spinner, _ := pterm.DefaultSpinner.Start("Deleting files and directories...")
@@ -235,8 +240,8 @@ func deleteFileBasedOnResults(results interface{}) error {
 	switch v := results.(type) {
 	case []types.EntryResults:
 		deletedFileCount, directoriesToRemove = deleteEntryResults(v)
-	case []types.DirectoryResult:
-		deletedFileCount, directoriesToRemove = deleteDirectoryResults(v)
+	// case []types.DirectoryResult:
+	// 		deletedFileCount, directoriesToRemove = deleteDirectoryResults(v)
 	default:
 		return fmt.Errorf("invalid data format: expected []EntryResults or []DirectoryResult, got %T", results)
 	}

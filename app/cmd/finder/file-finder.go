@@ -121,15 +121,25 @@ func initConfig() {
 
 func run(cmd *cobra.Command, args []string) {
 
-	fileType := commonUtils.ToFileType(string(viper.GetString("file-type-filter")))
+	fileTypeFilter := commonUtils.ToFileType(string(viper.GetString("file-type-filter")))
 	operatorType := commonUtils.ToOperatorType(string(viper.GetString("operator-type")))
 
-	if fileType == "" {
+	removeFiles := viper.GetBool("remove-files")
+	displayDetailedResults := viper.GetBool("display-detailed-results")
+
+	if fileTypeFilter == "" {
 		pterm.Error.Printf("invalid file type: %s", viper.GetString("file-type-filter"))
+		return
 	}
 
 	if operatorType == "" {
 		pterm.Error.Printf("invalid operator type: %s", viper.GetString("operator-type"))
+		return
+	}
+
+	if removeFiles && !displayDetailedResults {
+		pterm.Error.Printf("The flags --remove-files (-r) and --display-detailed-results (-d) must be used together, any other combination isn't supported")
+		return
 	}
 
 	fileFinder := types.FileFinder{
@@ -137,9 +147,9 @@ func run(cmd *cobra.Command, args []string) {
 		DisplayDetailedResults:   viper.GetBool("display-detailed-results"),
 		FileNameFilter:           viper.GetString("file-name-filter"),
 		FileSizeFilter:           viper.GetString("file-size-filter"),
-		FileTypeFilter:           fileType,
+		FileTypeFilter:           fileTypeFilter,
 		ListDuplicateFiles:       viper.GetBool("list-duplicate-files"),
-		RemoveFiles:              viper.GetBool("remove-files"),
+		RemoveFiles:              removeFiles,//viper.GetBool("remove-files"),
 		ToleranceSize:            viper.GetFloat64("tolerance-size"),
 		OperatorTypeFilter:       operatorType,
 		Results:                  make(map[string][]string),
