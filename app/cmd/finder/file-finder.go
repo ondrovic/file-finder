@@ -189,7 +189,6 @@ func Run(ff types.FileFinder) {
 	// toleranceSizeStr,
 	// )
 
-
 	files, err := utils.FindAndDisplayFiles(ff)
 
 	if err != nil {
