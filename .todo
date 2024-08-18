@@ -14,6 +14,7 @@ app/cmd/finder/file-finder.go:
         ☐ Application Banner
             ☐ implement display banner logic
         ☐ Version
+            ☐ implement version logic
     ✔ Make file-size optional, not required @done(24-08-18 09:28)
     ☐ Add Flag for find duplicate files
     ☐ Update rootCmd to new format
