@@ -31,8 +31,8 @@ type DirectoryResult struct {
 	Count     int
 }
 
-// EntryResults struct for more in depth entry info
-type EntryResults struct {
+// EntryResult struct for more in depth entry info
+type EntryResult struct {
 	Directory string
 	FileName  string
 	FileSize  string

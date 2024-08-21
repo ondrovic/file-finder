@@ -1,17 +1,13 @@
 package main
 
 import (
-	// "flag"
 	"os"
 	"reflect"
 	"runtime"
 
-	// "strings"
-
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
-	// "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"file-finder/internal/types"
@@ -20,7 +16,6 @@ import (
 	commonTypes "github.com/ondrovic/common/types"
 	commonUtils "github.com/ondrovic/common/utils"
 	commonCli "github.com/ondrovic/common/utils/cli"
-	// commonFormatters "github.com/ondrovic/common/utils/formatters"
 )
 
 // #region Cli Setup
@@ -70,12 +65,6 @@ func registerStringFlag(cmd *cobra.Command, name, shorthand, value, usage string
 func registerFloat64Flag(cmd *cobra.Command, name, shorthand string, value float64, usage string, target *float64) {
 	cmd.Flags().Float64VarP(target, name, shorthand, value, usage+"\n")
 }
-
-// func bindFlags(cmd *cobra.Command) {
-//     cmd.Flags().VisitAll(func(f *pflag.Flag) {
-//         viper.BindPFlag(f.Name, f)
-//     })
-// }
 
 func newCompletionCmd() *cobra.Command {
 	return &cobra.Command{
@@ -149,7 +138,7 @@ func run(cmd *cobra.Command, args []string) {
 		FileSizeFilter:           viper.GetString("file-size-filter"),
 		FileTypeFilter:           fileTypeFilter,
 		ListDuplicateFiles:       viper.GetBool("list-duplicate-files"),
-		RemoveFiles:              removeFiles,//viper.GetBool("remove-files"),
+		RemoveFiles:              removeFiles,
 		ToleranceSize:            viper.GetFloat64("tolerance-size"),
 		OperatorTypeFilter:       operatorType,
 		Results:                  make(map[string][]string),
@@ -170,34 +159,6 @@ func main() {
 }
 
 func Run(ff types.FileFinder) {
-	// fileSizeBytes, err := commonUtils.ConvertStringSizeToBytes(ff.FileSize)
-
-	// if err != nil {
-	// 	pterm.Error.Printf("Error converting file size: %v\n", err)
-	// 	return
-	// }
-
-	// // Format the file size for logging
-	// fileSizeStr := commonFormatters.FormatSize(fileSizeBytes)
-	// results, err := commonUtils.CalculateTolerances(fileSizeBytes, ff.ToleranceSize)
-
-	// if err != nil {
-	// 	pterm.Error.Printf("Error calculating tolerances: %v\n", err)
-	// 	return
-	// }
-
-	// // Calculate the tolerance size string
-	// toleranceSizeStr := ""
-	// if fileSizeStr != commonFormatters.FormatSize(results.LowerBoundSize) || fileSizeStr != commonFormatters.FormatSize(results.UpperBoundSize) {
-	// 	toleranceSizeStr = "( with a tolerance size of " + commonFormatters.FormatSize(results.LowerBoundSize) + " and " + commonFormatters.FormatSize(results.UpperBoundSize) + " )"
-	// }
-
-	// pterm.Info.Printf("Searching for files of type %v %s %s %s...\n",
-	// ff.FileType,
-	// strings.ToLower(string(ff.OperatorType)),
-	// fileSizeStr,
-	// toleranceSizeStr,
-	// )
 
 	files, err := utils.FindAndDisplayFiles(ff)
 
@@ -205,8 +166,6 @@ func Run(ff types.FileFinder) {
 		pterm.Error.Printf("error finding files: %v\n", err)
 		return
 	}
-
-	// fmt.Println(files)
 
 	if ff.RemoveFiles {
 		utils.DeleteFiles(files)

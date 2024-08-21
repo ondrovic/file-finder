@@ -10,6 +10,8 @@ project:
             ☐ setup testing workflow
             ☐ setup go releaser workflow
 app/cmd/finder/file-finder.go:
+    ☐ Convert PTERM over to bubbletea (still researching the frameork)
+    ✔ Add ability to click on results @done(24-08-21 12:00)
     ☐ Add common funcs
         ☐ Application Banner
             ☐ implement display banner logic
@@ -40,6 +42,8 @@ internal:
         utils.go:
             ✔ Adjust funcs based on FileSize option change @done(24-08-18 11:39)
             ✔ Adjust funcs to search by FileNameFilter option @done(24-08-18 11:39)
+            ☐ Fix table alignment issues
+            ☐ For detailed view add filesize total
             ☐ Create logic to find duplicate files
                 ☐ hash comparison
                 ☐ name similarities
