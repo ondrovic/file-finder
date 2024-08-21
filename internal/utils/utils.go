@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	semaphore = make(chan struct{}, runtime.NumCPU())
+	semaphore = make(chan struct{})
 )
 
 // FindAndDisplayFiles gathers the results and displays them
@@ -74,102 +74,33 @@ func getFiles(ff types.FileFinder) (interface{}, int, int64, error) {
 		return nil, 0, 0, err
 	}
 
-	var detailedResults []types.EntryResult
-	results := make(map[string][]string)
-	var totalCount int
-	var totalFileSize int64
+	// Initialize variables
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	results := make(map[string][]string)
+	var detailedResults []types.EntryResult
+	var totalCount int
+	var totalFileSize int64
 
-	// Convert filter to bytes
-	var fileSize int64
-	if ff.FileSizeFilter != "" {
-		var err error
-		fileSize, err = commonUtils.ConvertStringSizeToBytes(ff.FileSizeFilter)
-		if err != nil {
-			return nil, 0, 0, err
-		}
+	// Handle file size filter conversion
+	fileSize, err := convertFileSizeFilter(ff.FileSizeFilter)
+	if err != nil {
+		return nil, 0, 0, err
 	}
 
+	// Process each directory entry
+	semaphore = make(chan struct{}, runtime.NumCPU())
 	for _, entry := range entries {
 		wg.Add(1)
 		go func(entry os.DirEntry) {
 			defer wg.Done()
 			path := filepath.Join(ff.RootDirectory, entry.Name())
 			if entry.IsDir() {
-				semaphore <- struct{}{}
-				subFF := ff
-				subFF.RootDirectory = path
-				subResult, subCount, subSize, err := getFiles(subFF)
-				<-semaphore
-				if err != nil {
-					return
-				}
-				mu.Lock()
-				if ff.DisplayDetailedResults {
-					detailedResults = append(detailedResults, subResult.([]types.EntryResult)...)
-					totalFileSize += subSize
-				} else {
-					for dir, files := range subResult.(map[string][]string) {
-						results[dir] = append(results[dir], files...)
-					}
-				}
-				totalCount += subCount
-				mu.Unlock()
+				processDirectory(path, ff, &detailedResults, &results, &totalCount, &totalFileSize, &mu, &wg, semaphore)
 			} else {
-				if commonUtils.IsExtensionValid(ff.FileTypeFilter, path) {
-					info, err := entry.Info()
-					if err != nil {
-						return
-					}
-
-					size := info.Size()
-
-					// Apply FileSize filter only if it's present
-					var sizeMatches bool
-					if ff.FileSizeFilter != "" {
-						sizeMatches, err = commonUtils.GetOperatorSizeMatches(ff.OperatorTypeFilter, fileSize, ff.ToleranceSize, size)
-						if err != nil {
-							pterm.Error.Println(err)
-							return
-						}
-						if !sizeMatches {
-							return
-						}
-					}
-
-					// Convert ToLower
-					lowerEntryName, err := commonFormatters.ToLower(entry.Name())
-					if err != nil {
-						pterm.Error.Println(err)
-						return
-					}
-					lowerFileNameFilter, err := commonFormatters.ToLower(ff.FileNameFilter)
-					if err != nil {
-						pterm.Error.Println(err)
-						return
-					}
-					// Apply FileNameFilter if present
-					if ff.FileNameFilter != "" && !strings.Contains(lowerEntryName, lowerFileNameFilter) {
-						return
-					}
-
-					mu.Lock()
-					if ff.DisplayDetailedResults {
-						detailedResults = append(detailedResults, types.EntryResult{
-							Directory: ff.RootDirectory,
-							FileName:  entry.Name(),
-							FileSize:  commonFormatters.FormatSize(size),
-						})
-						totalFileSize += size // Accumulate the file size
-					} else {
-						results[ff.RootDirectory] = append(results[ff.RootDirectory], path)
-					}
-					totalCount++
-					mu.Unlock()
-				}
+				processFile(entry, path, ff, fileSize, &detailedResults, &results, &totalCount, &totalFileSize, &mu)
 			}
-		}(entry) // Pass entry to the goroutine
+		}(entry)
 	}
 
 	wg.Wait()
@@ -178,6 +109,108 @@ func getFiles(ff types.FileFinder) (interface{}, int, int64, error) {
 		return detailedResults, totalCount, totalFileSize, nil
 	}
 	return results, totalCount, 0, nil
+}
+
+// convertFileSizeFilter converts the file size filter string to bytes
+func convertFileSizeFilter(fileSizeFilter string) (int64, error) {
+	if fileSizeFilter == "" {
+		return 0, nil
+	}
+	return commonUtils.ConvertStringSizeToBytes(fileSizeFilter)
+}
+
+func processDirectory(path string, ff types.FileFinder, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, wg *sync.WaitGroup, semaphore chan struct{}) {
+	semaphore <- struct{}{}        // Acquire semaphore
+	defer func() { <-semaphore }() // Release semaphore
+
+	subFF := ff
+	subFF.RootDirectory = path
+	subResult, subCount, subSize, err := getFiles(subFF)
+	if err != nil {
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if ff.DisplayDetailedResults {
+		*detailedResults = append(*detailedResults, subResult.([]types.EntryResult)...)
+		*totalFileSize += subSize
+	} else {
+		for dir, files := range subResult.(map[string][]string) {
+			(*results)[dir] = append((*results)[dir], files...)
+		}
+	}
+	*totalCount += subCount
+}
+
+// processFile handles processing of a single file
+func processFile(entry os.DirEntry, path string, ff types.FileFinder, fileSize int64, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex) {
+	if !commonUtils.IsExtensionValid(ff.FileTypeFilter, path) {
+		return
+	}
+
+	info, err := entry.Info()
+	if err != nil {
+		return
+	}
+
+	size := info.Size()
+
+	// Apply file size filter if necessary
+	if ff.FileSizeFilter != "" && !applyFileSizeFilter(ff, size, fileSize) {
+		return
+	}
+
+	// Apply file name filter if necessary
+	if !applyFileNameFilter(ff, entry.Name()) {
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if ff.DisplayDetailedResults {
+		*detailedResults = append(*detailedResults, types.EntryResult{
+			Directory: ff.RootDirectory,
+			FileName:  entry.Name(),
+			FileSize:  commonFormatters.FormatSize(size),
+		})
+		*totalFileSize += size
+	} else {
+		(*results)[ff.RootDirectory] = append((*results)[ff.RootDirectory], path)
+	}
+	*totalCount++
+}
+
+// applyFileSizeFilter checks if a file matches the size criteria
+func applyFileSizeFilter(ff types.FileFinder, size, fileSize int64) bool {
+	sizeMatches, err := commonUtils.GetOperatorSizeMatches(ff.OperatorTypeFilter, fileSize, ff.ToleranceSize, size)
+	if err != nil {
+		pterm.Error.Println(err)
+		return false
+	}
+	return sizeMatches
+}
+
+// applyFileNameFilter checks if a file matches the name criteria
+func applyFileNameFilter(ff types.FileFinder, fileName string) bool {
+	if ff.FileNameFilter == "" {
+		return true
+	}
+
+	lowerEntryName, err := commonFormatters.ToLower(fileName)
+	if err != nil {
+		pterm.Error.Println(err)
+		return false
+	}
+	lowerFileNameFilter, err := commonFormatters.ToLower(ff.FileNameFilter)
+	if err != nil {
+		pterm.Error.Println(err)
+		return false
+	}
+
+	return strings.Contains(lowerEntryName, lowerFileNameFilter)
 }
 
 func deleteEntryResults(entries []types.EntryResult) (int, []string) {

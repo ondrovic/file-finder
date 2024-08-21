@@ -10,6 +10,7 @@ project:
             ☐ setup testing workflow
             ☐ setup go releaser workflow
 app/cmd/finder/file-finder.go:
+    ✔ Fix Complex Mehtod issue in utls.go @done(24-08-21 14:12)
     ☐ Convert PTERM over to bubbletea (still researching the frameork)
     ✔ Add ability to click on results @done(24-08-21 12:00)
     ☐ Add common funcs
