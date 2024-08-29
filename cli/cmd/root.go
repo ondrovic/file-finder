@@ -81,7 +81,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fileFinder := &types.CliFlags{
+	fileFinder := types.CliFlags{
 		DisplayApplicationBanner: viper.GetBool("display-app-banner"),
 		DisplayDetailedResults:   displayDetailedResults,
 		FileNameFilter:           viper.GetString("file-name-filter"),
@@ -102,8 +102,7 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func findFiles(ff *types.CliFlags) error {
-
+func findFiles(ff types.CliFlags) error {
 	// TODO: fix types
 	if files, err := utils.FindAndDisplayFiles(ff); err != nil {
 		return err

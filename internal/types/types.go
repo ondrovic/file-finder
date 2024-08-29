@@ -39,8 +39,8 @@ type EntryResult struct {
 	FileSize  string
 }
 
-// NewCliFlags initializes a new FileFinder object
-func NewCliFlags() *CliFlags {
+// NewFileFinder initializes a new FileFinder object
+func NewFileFinder() *CliFlags {
 	return &CliFlags{
 		Results: make(map[string][]string),
 	}
