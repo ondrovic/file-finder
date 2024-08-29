@@ -18,7 +18,7 @@ import (
 	commonFormatters "github.com/ondrovic/common/utils/formatters"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	// "github.com/jedib0t/go-pretty/v6/text"
 	"github.com/pterm/pterm"
 )
 
@@ -27,20 +27,24 @@ var (
 )
 
 // FindAndDisplayFiles gathers the results and displays them
-func FindAndDisplayFiles(ff types.CliFlags) (interface{}, error) {
-	results, count, size, err := getFiles(ff)
+func FindAndDisplayFiles(ff interface{}) (interface{}, error) {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: expected types.CliFlags")
+	}
+	results, count, size, err := getFiles(cliFlags)
 	if err != nil {
 		return nil, err
 	}
 
 	progressbar, _ := pterm.DefaultProgressbar.WithTotal(count).WithRemoveWhenDone(true).Start()
 
-	if !ff.DisplayDetailedResults {
-		ff.Results = results.(map[string][]string)
+	if !cliFlags.DisplayDetailedResults {
+		cliFlags.Results = results.(map[string][]string)
 		for i := 0; i < count; i++ {
 			progressbar.Increment()
 		}
-		results = processResults(ff.Results)
+		results = processResults(cliFlags.Results)
 	} else {
 		for i := 0; i < count; i++ {
 			progressbar.Increment()
@@ -50,7 +54,7 @@ func FindAndDisplayFiles(ff types.CliFlags) (interface{}, error) {
 	progressbar.Stop()
 
 	if count > 0 {
-		renderResultsToTable(results, count, size, ff)
+		renderResultsToTable(results, count, size, cliFlags)
 	} else {
 		pterm.Info.Printf("%d results found matching criteria\n", count)
 	}
@@ -68,8 +72,12 @@ func getResultsCount(results interface{}) (int, error) {
 }
 
 // getFiles handles getting the files based on the criteria
-func getFiles(ff types.CliFlags) (interface{}, int, int64, error) {
-	entries, err := os.ReadDir(ff.RootDirectory)
+func getFiles(ff interface{}) (interface{}, int, int64, error) {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return nil, 0, 0, fmt.Errorf("invalid input type: expected types.CliFlags")
+	}
+	entries, err := os.ReadDir(cliFlags.RootDirectory)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -83,7 +91,7 @@ func getFiles(ff types.CliFlags) (interface{}, int, int64, error) {
 	var totalFileSize int64
 
 	// Handle file size filter conversion
-	fileSize, err := convertFileSizeFilter(ff.FileSizeFilter)
+	fileSize, err := convertFileSizeFilter(cliFlags.FileSizeFilter)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -94,18 +102,18 @@ func getFiles(ff types.CliFlags) (interface{}, int, int64, error) {
 		wg.Add(1)
 		go func(entry os.DirEntry) {
 			defer wg.Done()
-			path := filepath.Join(ff.RootDirectory, entry.Name())
+			path := filepath.Join(cliFlags.RootDirectory, entry.Name())
 			if entry.IsDir() {
-				processDirectory(path, ff, &detailedResults, &results, &totalCount, &totalFileSize, &mu, &wg, semaphore)
+				processDirectory(path, cliFlags, &detailedResults, &results, &totalCount, &totalFileSize, &mu, semaphore)
 			} else {
-				processFile(entry, path, ff, fileSize, &detailedResults, &results, &totalCount, &totalFileSize, &mu)
+				processFile(entry, path, cliFlags, fileSize, &detailedResults, &results, &totalCount, &totalFileSize, &mu)
 			}
 		}(entry)
 	}
 
 	wg.Wait()
 
-	if ff.DisplayDetailedResults {
+	if cliFlags.DisplayDetailedResults {
 		return detailedResults, totalCount, totalFileSize, nil
 	}
 	return results, totalCount, 0, nil
@@ -119,11 +127,15 @@ func convertFileSizeFilter(fileSizeFilter string) (int64, error) {
 	return commonUtils.ConvertStringSizeToBytes(fileSizeFilter)
 }
 
-func processDirectory(path string, ff types.CliFlags, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, wg *sync.WaitGroup, semaphore chan struct{}) {
+func processDirectory(path string, ff interface{}, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, semaphore chan struct{}) {
 	semaphore <- struct{}{}        // Acquire semaphore
 	defer func() { <-semaphore }() // Release semaphore
 
-	subFF := ff
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return
+	}
+	subFF := cliFlags
 	subFF.RootDirectory = path
 	subResult, subCount, subSize, err := getFiles(subFF)
 	if err != nil {
@@ -135,7 +147,7 @@ func processDirectory(path string, ff types.CliFlags, detailedResults *[]types.E
 
 	// wg.Wait()
 
-	if ff.DisplayDetailedResults {
+	if cliFlags.DisplayDetailedResults {
 		*detailedResults = append(*detailedResults, subResult.([]types.EntryResult)...)
 		*totalFileSize += subSize
 	} else {
@@ -147,8 +159,12 @@ func processDirectory(path string, ff types.CliFlags, detailedResults *[]types.E
 }
 
 // processFile handles processing of a single file
-func processFile(entry os.DirEntry, path string, ff types.CliFlags, fileSize int64, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex) {
-	if !commonUtils.IsExtensionValid(ff.FileTypeFilter, path) {
+func processFile(entry os.DirEntry, path string, ff interface{}, fileSize int64, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex) {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return
+	}
+	if !commonUtils.IsExtensionValid(cliFlags.FileTypeFilter, path) {
 		return
 	}
 
@@ -160,34 +176,38 @@ func processFile(entry os.DirEntry, path string, ff types.CliFlags, fileSize int
 	size := info.Size()
 
 	// Apply file size filter if necessary
-	if ff.FileSizeFilter != "" && !applyFileSizeFilter(ff, size, fileSize) {
+	if cliFlags.FileSizeFilter != "" && !applyFileSizeFilter(cliFlags, size, fileSize) {
 		return
 	}
 
 	// Apply file name filter if necessary
-	if !applyFileNameFilter(ff, entry.Name()) {
+	if !applyFileNameFilter(cliFlags, entry.Name()) {
 		return
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 
-	if ff.DisplayDetailedResults {
+	if cliFlags.DisplayDetailedResults {
 		*detailedResults = append(*detailedResults, types.EntryResult{
-			Directory: ff.RootDirectory,
+			Directory: cliFlags.RootDirectory,
 			FileName:  entry.Name(),
 			FileSize:  commonFormatters.FormatSize(size),
 		})
 		*totalFileSize += size
 	} else {
-		(*results)[ff.RootDirectory] = append((*results)[ff.RootDirectory], path)
+		(*results)[cliFlags.RootDirectory] = append((*results)[cliFlags.RootDirectory], path)
 	}
 	*totalCount++
 }
 
 // applyFileSizeFilter checks if a file matches the size criteria
-func applyFileSizeFilter(ff types.CliFlags, size, fileSize int64) bool {
-	sizeMatches, err := commonUtils.GetOperatorSizeMatches(ff.OperatorTypeFilter, fileSize, ff.ToleranceSize, size)
+func applyFileSizeFilter(ff interface{}, size, fileSize int64) bool {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return false
+	}
+	sizeMatches, err := commonUtils.GetOperatorSizeMatches(cliFlags.OperatorTypeFilter, fileSize, cliFlags.ToleranceSize, size)
 	if err != nil {
 		pterm.Error.Println(err)
 		return false
@@ -196,8 +216,13 @@ func applyFileSizeFilter(ff types.CliFlags, size, fileSize int64) bool {
 }
 
 // applyFileNameFilter checks if a file matches the name criteria
-func applyFileNameFilter(ff types.CliFlags, fileName string) bool {
-	if ff.FileNameFilter == "" {
+func applyFileNameFilter(ff interface{}, fileName string) bool {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return false
+	}
+
+	if cliFlags.FileNameFilter == "" {
 		return true
 	}
 
@@ -206,7 +231,7 @@ func applyFileNameFilter(ff types.CliFlags, fileName string) bool {
 		pterm.Error.Println(err)
 		return false
 	}
-	lowerFileNameFilter, err := commonFormatters.ToLower(ff.FileNameFilter)
+	lowerFileNameFilter, err := commonFormatters.ToLower(cliFlags.FileNameFilter)
 	if err != nil {
 		pterm.Error.Println(err)
 		return false
@@ -361,7 +386,7 @@ func isDirEmpty(dir string) (bool, error) {
 }
 
 // DeleteFiles
-func DeleteFiles(results interface{}) {
+func DeleteFiles(results interface{}) error {
 
 	resultCount, err := getResultsCount(results)
 	if err != nil {
@@ -375,11 +400,15 @@ func DeleteFiles(results interface{}) {
 		// result := true
 		if !result {
 			pterm.Info.Println("Deletion cancelled.")
-			return
+			return nil
 		}
 
-		deleteFileBasedOnResults(results)
+		if err := deleteFileBasedOnResults(results); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // processResults processes the results
@@ -403,7 +432,11 @@ func processResults(results map[string][]string) []types.DirectoryResult {
 // 	return text.Hyperlink(link, txt)
 // }
 
-func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff types.CliFlags) {
+func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff interface{}) {
+	cliFlags, ok := ff.(types.CliFlags)
+	if !ok {
+		return
+	}
 	t := table.Table{}
 
 	// Determine header and footer based on the type of results
@@ -433,7 +466,7 @@ func renderResultsToTable(results interface{}, totalCount int, totalFileSize int
 			})
 		}
 	case []types.EntryResult:
-		if ff.DisplayDetailedResults {
+		if cliFlags.DisplayDetailedResults {
 			for _, result := range results {
 				// newLink := pterm.Sprintf("%s/%s", result.Directory, result.FileName)
 				t.AppendRow(table.Row{

@@ -35,7 +35,7 @@ func init() {
 
 	appNameToLower, err := sharedFormatters.ToLower(appName)
 	if err != nil {
-		// TODO: handle error
+		fmt.Println(err)
 		return
 	}
 
@@ -103,20 +103,21 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func findFiles(ff types.CliFlags) error {
-	// TODO: fix types
 	if files, err := utils.FindAndDisplayFiles(ff); err != nil {
 		return err
 	} else if ff.RemoveFiles {
-		// TODO: add error handling
-		utils.DeleteFiles(files)
+		if err := utils.DeleteFiles(files); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func Execute() {
+func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
-		// TODO: handle error
-		return
+		return err
 	}
+
+	return nil
 }
