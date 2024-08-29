@@ -6,7 +6,7 @@ import (
 
 // TestNewFileFinder checks that NewFileFinder initializes a FileFinder with default values
 func TestNewFileFinder(t *testing.T) {
-	ff := NewFileFinder()
+	ff := NewCliFlags()
 
 	if ff == nil {
 		t.Fatal("expected NewFileFinder to return a non-nil pointer")
