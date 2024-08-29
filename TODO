@@ -1,14 +1,16 @@
 project:
+    ☐ reactor to use charm suite of ui stuff
+        ☐ 
     readme:
         ☐ update readme
             ☐ include bages from workflows
             ☐ usage examples
     makefile:
-        ☐ setup Makefile
+        ✔ setup Makefile @done(24-08-29 12:58)
     github:
         workflows:
-            ☐ setup testing workflow
-            ☐ setup go releaser workflow
+            ✔ setup testing workflow @done(24-08-29 12:57)
+            ✔ setup go releaser workflow @done(24-08-29 12:57)
 app/cmd/finder/file-finder.go:
     ✔ Fix Complex Mehtod issue in utls.go @done(24-08-21 14:12)
     ☐ Convert PTERM over to bubbletea (still researching the frameork)

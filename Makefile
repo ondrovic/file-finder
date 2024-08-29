@@ -3,7 +3,7 @@ GOOS := $(shell go env GOOS)
 VERSION := $(shell git describe --tags --always)
 BUILD_FLAGS := -ldflags="-X 'main.version=$(VERSION)'"
 # update to main app path
-APP_PATH := .\app\cmd\finder\file-finder.go
+APP_PATH := .\file-finder.go
 
 # determins the variables based on GOOS 
 ifeq ($(GOOS), windows)

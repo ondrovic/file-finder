@@ -27,7 +27,7 @@ var (
 )
 
 // FindAndDisplayFiles gathers the results and displays them
-func FindAndDisplayFiles(ff types.FileFinder) (interface{}, error) {
+func FindAndDisplayFiles(ff types.CliFlags) (interface{}, error) {
 	results, count, size, err := getFiles(ff)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func getResultsCount(results interface{}) (int, error) {
 }
 
 // getFiles handles getting the files based on the criteria
-func getFiles(ff types.FileFinder) (interface{}, int, int64, error) {
+func getFiles(ff types.CliFlags) (interface{}, int, int64, error) {
 	entries, err := os.ReadDir(ff.RootDirectory)
 	if err != nil {
 		return nil, 0, 0, err
@@ -119,7 +119,7 @@ func convertFileSizeFilter(fileSizeFilter string) (int64, error) {
 	return commonUtils.ConvertStringSizeToBytes(fileSizeFilter)
 }
 
-func processDirectory(path string, ff types.FileFinder, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, wg *sync.WaitGroup, semaphore chan struct{}) {
+func processDirectory(path string, ff types.CliFlags, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, wg *sync.WaitGroup, semaphore chan struct{}) {
 	semaphore <- struct{}{}        // Acquire semaphore
 	defer func() { <-semaphore }() // Release semaphore
 
@@ -133,6 +133,8 @@ func processDirectory(path string, ff types.FileFinder, detailedResults *[]types
 	mu.Lock()
 	defer mu.Unlock()
 
+	// wg.Wait()
+
 	if ff.DisplayDetailedResults {
 		*detailedResults = append(*detailedResults, subResult.([]types.EntryResult)...)
 		*totalFileSize += subSize
@@ -145,7 +147,7 @@ func processDirectory(path string, ff types.FileFinder, detailedResults *[]types
 }
 
 // processFile handles processing of a single file
-func processFile(entry os.DirEntry, path string, ff types.FileFinder, fileSize int64, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex) {
+func processFile(entry os.DirEntry, path string, ff types.CliFlags, fileSize int64, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex) {
 	if !commonUtils.IsExtensionValid(ff.FileTypeFilter, path) {
 		return
 	}
@@ -184,7 +186,7 @@ func processFile(entry os.DirEntry, path string, ff types.FileFinder, fileSize i
 }
 
 // applyFileSizeFilter checks if a file matches the size criteria
-func applyFileSizeFilter(ff types.FileFinder, size, fileSize int64) bool {
+func applyFileSizeFilter(ff types.CliFlags, size, fileSize int64) bool {
 	sizeMatches, err := commonUtils.GetOperatorSizeMatches(ff.OperatorTypeFilter, fileSize, ff.ToleranceSize, size)
 	if err != nil {
 		pterm.Error.Println(err)
@@ -194,7 +196,7 @@ func applyFileSizeFilter(ff types.FileFinder, size, fileSize int64) bool {
 }
 
 // applyFileNameFilter checks if a file matches the name criteria
-func applyFileNameFilter(ff types.FileFinder, fileName string) bool {
+func applyFileNameFilter(ff types.CliFlags, fileName string) bool {
 	if ff.FileNameFilter == "" {
 		return true
 	}
@@ -392,16 +394,16 @@ func processResults(results map[string][]string) []types.DirectoryResult {
 	return processedResults
 }
 
-func formatResultHyperLink(link, txt string) string {
-	text.EnableColors()
+// func formatResultHyperLink(link, txt string) string {
+// 	text.EnableColors()
 
-	link = commonFormatters.FormatPath(link, runtime.GOOS)
-	txt = text.FgGreen.Sprint(txt)
+// 	link = commonFormatters.FormatPath(link, runtime.GOOS)
+// 	txt = text.FgGreen.Sprint(txt)
 
-	return text.Hyperlink(link, txt)
-}
+// 	return text.Hyperlink(link, txt)
+// }
 
-func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff types.FileFinder) {
+func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff types.CliFlags) {
 	t := table.Table{}
 
 	// Determine header and footer based on the type of results
@@ -425,17 +427,20 @@ func renderResultsToTable(results interface{}, totalCount int, totalFileSize int
 	case []types.DirectoryResult:
 		for _, result := range results {
 			t.AppendRow(table.Row{
-				formatResultHyperLink(result.Directory, result.Directory),
+				result.Directory,
+				// formatResultHyperLink(result.Directory, result.Directory),
 				pterm.Sprintf("%v", result.Count),
 			})
 		}
 	case []types.EntryResult:
 		if ff.DisplayDetailedResults {
 			for _, result := range results {
-				newLink := pterm.Sprintf("%s/%s", result.Directory, result.FileName)
+				// newLink := pterm.Sprintf("%s/%s", result.Directory, result.FileName)
 				t.AppendRow(table.Row{
-					formatResultHyperLink(result.Directory, result.Directory),
-					formatResultHyperLink(newLink, result.FileName),
+					result.Directory,
+					result.FileName,
+					// formatResultHyperLink(result.Directory, result.Directory),
+					// formatResultHyperLink(newLink, result.FileName),
 					result.FileSize,
 				})
 			}
