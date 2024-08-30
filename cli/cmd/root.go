@@ -52,9 +52,10 @@ func init() {
 		Long:  application.Description,
 		Args:  cobra.ExactArgs(1),
 		RunE:  run,
+		Version: application.Version,
 	}
 
-	rootCmd.SetVersionTemplate(`{{printf "Version: %s\n" .Version}}`)
+	// rootCmd.SetVersionTemplate(`{{printf "Version: %s\n" .Version}}`)
 
 	cli.RegisterBoolFlag(rootCmd, "display-app-banner", "b", false, "Whether or not to display the application banner", &options.DisplayApplicationBanner)
 	cli.RegisterBoolFlag(rootCmd, "display-detailed-results", "d", false, "Display detailed results", &options.DisplayDetailedResults)
