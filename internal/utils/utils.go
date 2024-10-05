@@ -14,12 +14,15 @@ import (
 
 	"file-finder/internal/types"
 
+	"github.com/mattn/go-isatty"
 	commonUtils "github.com/ondrovic/common/utils"
 	commonFormatters "github.com/ondrovic/common/utils/formatters"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/pterm/pterm"
+	"golang.org/x/sys/windows"
+	"golang.org/x/term"
 )
 
 var (
@@ -401,9 +404,36 @@ func formatResultHyperLink(link, txt string) string {
 	return text.Hyperlink(link, txt)
 }
 
+func getTerminalSize() (int, int, error) {
+	if !isatty.IsTerminal(os.Stdout.Fd()) {
+		return 0, 0, fmt.Errorf("not a terminal")
+	}
+
+	if runtime.GOOS == "windows" {
+		return getTerminalSizeWindows()
+	}
+	return term.GetSize(int(os.Stdin.Fd()))
+}
+
+func getTerminalSizeWindows() (int, int, error) {
+	handle := windows.Handle(os.Stdout.Fd())
+	var info windows.ConsoleScreenBufferInfo
+	err := windows.GetConsoleScreenBufferInfo(handle, &info)
+	if err != nil {
+		return 0, 0, err
+	}
+	width := int(info.Window.Right - info.Window.Left + 1)
+	height := int(info.Window.Bottom - info.Window.Top + 1)
+	return width, height, nil
+}
+
 func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff types.FileFinder) {
 	t := table.Table{}
-
+	w, _, err := getTerminalSize()
+	if err != nil {
+		fmt.Printf("error getting terminal size %v\n", err)
+	}
+	// fmt.Printf("Terminal size: Width = %d, Height = %d\n", w, h)
 	// Determine header and footer based on the type of results
 	var header table.Row
 	var footer table.Row
@@ -445,6 +475,9 @@ func renderResultsToTable(results interface{}, totalCount int, totalFileSize int
 	t.AppendFooter(footer)
 
 	t.SetStyle(table.StyleColoredDark)
+	t.Style().Size = table.SizeOptions{
+		WidthMin: w,
+	}
 	t.SetOutputMirror(os.Stdout)
 	t.Render()
 }
