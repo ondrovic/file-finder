@@ -43,7 +43,7 @@ internal:
         utils.go:
             ✔ Adjust funcs based on FileSize option change @done(24-08-18 11:39)
             ✔ Adjust funcs to search by FileNameFilter option @done(24-08-18 11:39)
-            ☐ Fix table alignment issues
+            ✔ Fix table alignment issues @done(24-10-05 17:44)
             ☐ For detailed view add filesize total
             ☐ Create logic to find duplicate files
                 ☐ hash comparison
