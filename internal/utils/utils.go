@@ -14,15 +14,12 @@ import (
 
 	"file-finder/internal/types"
 
-	"github.com/mattn/go-isatty"
 	commonUtils "github.com/ondrovic/common/utils"
 	commonFormatters "github.com/ondrovic/common/utils/formatters"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/pterm/pterm"
-	"golang.org/x/sys/windows"
-	"golang.org/x/term"
 )
 
 var (
@@ -99,7 +96,7 @@ func getFiles(ff types.FileFinder) (interface{}, int, int64, error) {
 			defer wg.Done()
 			path := filepath.Join(ff.RootDirectory, entry.Name())
 			if entry.IsDir() {
-				processDirectory(path, ff, &detailedResults, &results, &totalCount, &totalFileSize, &mu, &wg, semaphore)
+				processDirectory(path, ff, &detailedResults, &results, &totalCount, &totalFileSize, &mu, semaphore)
 			} else {
 				processFile(entry, path, ff, fileSize, &detailedResults, &results, &totalCount, &totalFileSize, &mu)
 			}
@@ -122,7 +119,7 @@ func convertFileSizeFilter(fileSizeFilter string) (int64, error) {
 	return commonUtils.ConvertStringSizeToBytes(fileSizeFilter)
 }
 
-func processDirectory(path string, ff types.FileFinder, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, wg *sync.WaitGroup, semaphore chan struct{}) {
+func processDirectory(path string, ff types.FileFinder, detailedResults *[]types.EntryResult, results *map[string][]string, totalCount *int, totalFileSize *int64, mu *sync.Mutex, semaphore chan struct{}) {
 	semaphore <- struct{}{}        // Acquire semaphore
 	defer func() { <-semaphore }() // Release semaphore
 
@@ -404,28 +401,28 @@ func formatResultHyperLink(link, txt string) string {
 	return text.Hyperlink(link, txt)
 }
 
-func getTerminalSize() (int, int, error) {
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		return 0, 0, fmt.Errorf("not a terminal")
-	}
+// func getTerminalSize() (int, int, error) {
+// 	if !isatty.IsTerminal(os.Stdout.Fd()) {
+// 		return 0, 0, fmt.Errorf("not a terminal")
+// 	}
 
-	if runtime.GOOS == "windows" {
-		return getTerminalSizeWindows()
-	}
-	return term.GetSize(int(os.Stdin.Fd()))
-}
+// 	if runtime.GOOS == "windows" {
+// 		return getTerminalSizeWindows()
+// 	}
+// 	return term.GetSize(int(os.Stdin.Fd()))
+// }
 
-func getTerminalSizeWindows() (int, int, error) {
-	handle := windows.Handle(os.Stdout.Fd())
-	var info windows.ConsoleScreenBufferInfo
-	err := windows.GetConsoleScreenBufferInfo(handle, &info)
-	if err != nil {
-		return 0, 0, err
-	}
-	width := int(info.Window.Right - info.Window.Left + 1)
-	height := int(info.Window.Bottom - info.Window.Top + 1)
-	return width, height, nil
-}
+// func getTerminalSizeWindows() (int, int, error) {
+// 	handle := windows.Handle(os.Stdout.Fd())
+// 	var info windows.ConsoleScreenBufferInfo
+// 	err := windows.GetConsoleScreenBufferInfo(handle, &info)
+// 	if err != nil {
+// 		return 0, 0, err
+// 	}
+// 	width := int(info.Window.Right - info.Window.Left + 1)
+// 	height := int(info.Window.Bottom - info.Window.Top + 1)
+// 	return width, height, nil
+// }
 
 func renderResultsToTable(results interface{}, totalCount int, totalFileSize int64, ff types.FileFinder) {
 	t := table.Table{}

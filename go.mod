@@ -6,7 +6,6 @@ toolchain go1.23.0
 
 require (
 	github.com/jedib0t/go-pretty/v6 v6.6.1-0.20241005144220-9949e904f6d4
-	github.com/mattn/go-isatty v0.0.20
 	github.com/ondrovic/common v0.1.24
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.1
